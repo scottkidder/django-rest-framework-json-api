@@ -37,6 +37,18 @@ else:
     from django.db.models.fields.related import ReverseManyRelatedObjectsDescriptor
     from django.contrib.contenttypes.fields import ReverseGenericRelatedObjectsDescriptor as ReverseGenericManyToOneDescriptor
 
+POLYMORPHIC_ANCESTORS = ()
+try:
+    from polymorphic.models import PolymorphicModel
+    POLYMORPHIC_ANCESTORS += (PolymorphicModel,)
+except ImportError:
+    pass
+try:
+    from typedmodels.models import TypedModel
+    POLYMORPHIC_ANCESTORS += (TypedModel,)
+except ImportError:
+    pass
+
 
 def get_resource_name(context):
     """
