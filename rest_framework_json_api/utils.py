@@ -38,16 +38,9 @@ else:
     from django.contrib.contenttypes.fields import ReverseGenericRelatedObjectsDescriptor as ReverseGenericManyToOneDescriptor
 
 POLYMORPHIC_ANCESTORS = ()
-try:
-    from polymorphic.models import PolymorphicModel
-    POLYMORPHIC_ANCESTORS += (PolymorphicModel,)
-except ImportError:
-    pass
-try:
-    from typedmodels.models import TypedModel
-    POLYMORPHIC_ANCESTORS += (TypedModel,)
-except ImportError:
-    pass
+for ancestor in getattr(settings, 'JSON_API_POLYMORPHIC_ANCESTORS', ()):
+    ancestor_class = import_class_from_dotted_path(ancestor)
+    POLYMORPHIC_ANCESTORS += (ancestor_class,)
 
 
 def get_resource_name(context):
