@@ -1,6 +1,7 @@
 """
 Parsers
 """
+import six
 from rest_framework import parsers
 from rest_framework.exceptions import ParseError
 
@@ -64,6 +65,47 @@ class JSONParser(parsers.JSONParser):
             raise ParseError('Received document does not contain primary data')
 
         data = result.get('data')
+
+        if data:
+            from rest_framework_json_api.views import RelationshipView
+            if isinstance(parser_context['view'], RelationshipView):
+                # We skip parsing the object as JSONAPI Resource Identifier Object and not a regular Resource Object
+                if isinstance(data, list):
+                    for resource_identifier_object in data:
+                        if not (resource_identifier_object.get('id') and resource_identifier_object.get('type')):
+                            raise ParseError(
+                                'Received data contains one or more malformed JSONAPI Resource Identifier Object(s)'
+                            )
+                elif not (data.get('id') and data.get('type')):
+                    raise ParseError('Received data is not a valid JSONAPI Resource Identifier Object')
+
+                return data
+
+            request = parser_context.get('request')
+
+            # Check for inconsistencies
+            resource_name = utils.get_resource_name(parser_context)
+            if isinstance(resource_name, six.string_types):
+                doesnt_match = data.get('type') != resource_name
+            else:
+                doesnt_match = data.get('type') not in resource_name
+            if doesnt_match and request.method in ('PUT', 'POST', 'PATCH'):
+                raise exceptions.Conflict(
+                    "The resource object's type ({data_type}) is not the type "
+                    "that constitute the collection represented by the endpoint ({resource_type}).".format(
+                        data_type=data.get('type'),
+                        resource_type=resource_name
+                    )
+                )
+            if not data.get('id') and request.method in ('PATCH', 'PUT'):
+                raise ParseError("The resource identifier object must contain an 'id' member")
+
+            # Construct the return data
+            parsed_data = {'id': data.get('id'), 'type': data.get('type')}
+            parsed_data.update(self.parse_attributes(data))
+            parsed_data.update(self.parse_relationships(data))
+            parsed_data.update(self.parse_metadata(result))
+            return parsed_data
 
         from rest_framework_json_api.views import RelationshipView
         if isinstance(parser_context['view'], RelationshipView):
